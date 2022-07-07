@@ -24,7 +24,7 @@ help : affiche cette aide.
 - stop : arrête toutes les machines ECS qui portent le tag shutdown=yes.
 - stop tag=val : arrête toutes les machines ECS qui portent le tag avec la valeur précisée.
 
-Vous devez initialiser les variables d'environnement xuivantes :
+Vous devez initialiser les variables d'environnement suivantes :
 - FE_REGION : la région Flexible Engine
 - FE_DOMAIN_NAME : le nom de votre domain Flexible Engine (page My Credential)
 - FE_PROJECT_NAME : le nom de votre projet Flexible Engine (page My Credential)
