@@ -5,17 +5,38 @@ import json
 import sys
 import os
 
-FE_IAM_URL="https://iam.eu-west-0.prod-cloud-ocb.orange-business.com"
-FE_ECS_URL="https://ecs.eu-west-0.prod-cloud-ocb.orange-business.com"
 
 USAGE="""Usage : flexeng <action> [<tagname>=<tagvalue>]
 actions : help list start stop
 exemple : "flexeng list groupe=sul"
-exemple : "start" équivalent à "start startup yes"
-exemple : "stop" équivalent à "stop shutdown yes"
+exemple : "start" équivalent à "start startup=yes"
+exemple : "stop" équivalent à "stop shutdown=yes"
 """
 
-def get_auth_token(domain:str, project:str, username:str, password:str):
+HELP="""flexeng
+
+help : affiche cette aide.
+
+list : liste toutes les machines ECS du projet.
+list tag=val : liste toutes les machines ECS du projet qui portent le tag avec la valeur précisée.
+
+start : démarre toutes les machines ECS qui portent le tag startup=yes.
+start tag=val : démarre toutes les machines ECS qui portent le tag avec la valeur précisée.
+
+stop : arrête toutes les machines ECS qui portent le tag shutdown=yes.
+start tag=val : arrête toutes les machines ECS qui portent le tag avec la valeur précisée.
+
+
+Vous devez initialiser les variables d'environnement suivantes :
+FE_REGION : la région Flexible Engine
+FE_DOMAIN_NAME : le nom de votre domain Flexible Engine (page My Credential)
+FE_PROJECT_NAME : le nom de votre projet Flexible Engine (page My Credential)
+FE_PROJECT_ID : l'id de votre projet Flexible Engine (page My Credential)
+FE_USER_NAME : votre nom d'utilisateur (page My Credential)
+FE_USER_PASSWORD : le mot de passe API que vous avez initialisé depuis votre mail "Bienvenue sur la console Flexible Engine"
+"""
+
+def get_auth_token():
     api_url = FE_IAM_URL + "/v3/auth/tokens"
     body="""
     {
@@ -38,20 +59,23 @@ def get_auth_token(domain:str, project:str, username:str, password:str):
                 }
             }
         }
-    }"""%(username,password,domain,project)
-
+    }"""%(FE_USER_NAME,FE_USER_PASSWORD,FE_DOMAIN_NAME,FE_PROJECT_NAME)
+    
+    global FE_TOKEN
+    
     body_json = json.loads(body)
     response = requests.post(api_url, json=body_json)
     if response.status_code == 201:
-        fe_tok = response.headers["X-Subject-Token"]
-        return fe_tok
+        FE_TOKEN = response.headers["X-Subject-Token"]
     else:
+        FE_TOKEN = False
         print("get_auth_token:" + response.text)
-        return False
+        print('Erreur à la récupération du token')
+        exit(1)
 
 
-def list_all_ecs(project_id):
-    api_url = FE_ECS_URL + f"/v2.1/{project_id}/servers"
+def list_all_ecs():
+    api_url = FE_ECS_URL + f"/v2.1/{FE_PROJECT_ID}/servers"
 
     response = requests.get(api_url, headers = {"X-Auth-Token": FE_TOKEN})
     servers = {}
@@ -64,8 +88,8 @@ def list_all_ecs(project_id):
     return servers
 
 
-def list_ecs(project_id, tag, value):
-    api_url = FE_ECS_URL + f"/v1/{project_id}/servers/resource_instances/action"
+def list_ecs(tag:str, value:str):
+    api_url = FE_ECS_URL + f"/v1/{FE_PROJECT_ID}/servers/resource_instances/action"
     body="""{
         "limit": "20", 
         "action": "filter",  
@@ -88,13 +112,9 @@ def list_ecs(project_id, tag, value):
     return servers
 
 
-def do_ecs(action,project_id, servers):
-    api_url = FE_ECS_URL + f"/v1/{project_id}/cloudservers/action"
-    serv_frag_list = []
-    for s in servers.values():
-        serv_frag_list.append({"id": s})
-    serv_frag = { "servers": serv_frag_list }
-    body_json = { f"os-{action}": serv_frag }
+def do_ecs(action:str, servers:list):
+    api_url = FE_ECS_URL + f"/v1/{FE_PROJECT_ID}/cloudservers/action"
+    body_json = { f"os-{action}": { "servers": [{"id": s} for s in servers.values()] } }
 
     response = requests.post(api_url, json=body_json, headers = {"X-Auth-Token": FE_TOKEN})
     if response.status_code == 200:
@@ -104,72 +124,64 @@ def do_ecs(action,project_id, servers):
         print(response.text)
         return False
 
-def get_environ():
-    global FE_DOMAIN_NAME
-    global FE_PROJECT_NAME
-    global FE_PROJECT_ID
-    global FE_USER_NAME
-    global FE_USER_PASSWORD
+def get_env_vars():
+    global FE_REGION, FE_DOMAIN_NAME, FE_PROJECT_NAME,FE_PROJECT_ID,FE_USER_NAME,FE_USER_PASSWORD
+    global FE_IAM_URL, FE_ECS_URL
 
-    if "FE_DOMAIN_NAME" not in os.environ or "FE_PROJECT_NAME" not in os.environ or "FE_PROJECT_ID" not in os.environ \
-    or "FE_USER_NAME" not in os.environ or "FE_USER_PASSWORD" not in os.environ:
-        print("Erreur: Vous devez initialiser les variables d'environnement FE_DOMAIN_NAME FE_PROJECT_NAME FE_PROJECT_ID FE_USER_NAME")
+    if "FE_REGION" not in os.environ or "FE_DOMAIN_NAME" not in os.environ or "FE_PROJECT_NAME" not in os.environ \
+    or "FE_PROJECT_ID" not in os.environ or "FE_USER_NAME" not in os.environ or "FE_USER_PASSWORD" not in os.environ:
+        print("Erreur: Vous devez initialiser les variables d'environnement FE_REGION FE_DOMAIN_NAME FE_PROJECT_NAME FE_PROJECT_ID FE_USER_NAME FE_USER_PASSWORD")
         exit(-2)
 
+    FE_REGION=os.getenv("FE_REGION")
     FE_DOMAIN_NAME=os.getenv("FE_DOMAIN_NAME")
     FE_PROJECT_NAME=os.getenv("FE_PROJECT_NAME")
     FE_PROJECT_ID=os.getenv("FE_PROJECT_ID")
     FE_USER_NAME=os.getenv("FE_USER_NAME")
     FE_USER_PASSWORD=os.getenv("FE_USER_PASSWORD")
 
+    FE_IAM_URL=f"https://iam.{FE_REGION}.prod-cloud-ocb.orange-business.com"
+    FE_ECS_URL=f"https://ecs.{FE_REGION}.prod-cloud-ocb.orange-business.com"
+
 
 def get_args():
     nbargs = len(sys.argv)
+    action,tagname,tagvalue = sys.argv[1],False,False
     if  nbargs == 2:
-        action = sys.argv[1]
         if action == "stop":
             tagname,tagvalue="shutdown","yes"
         elif action == "start":
             tagname,tagvalue="startup","yes"
-        else:
-            tagname,tagvalue=False,False
     elif nbargs == 3:
-        action = sys.argv[1]
         tagname,tagvalue = sys.argv[2].split("=")
     else:
         print(USAGE)
         exit(-1)
-    return nbargs,action,tagname,tagvalue
+    return action,tagname,tagvalue
 
-def main():
-    get_environ()
-    
-    nbargs,action,tagname,tagvalue=get_args()
-
-    global FE_TOKEN
-    FE_TOKEN=get_auth_token(FE_DOMAIN_NAME,FE_PROJECT_NAME,FE_USER_NAME,FE_USER_PASSWORD)
-    if FE_TOKEN is False:
-        print('Erreur à la récupération du token')
-        exit(1)
+if __name__ == "__main__":
+    action,tagname,tagvalue=get_args()
 
     if action == "start" or action == "stop":
-        servers = list_ecs(FE_PROJECT_ID,tagname,tagvalue)
-        #print("list_ecs : " + str(servers))
-        if do_ecs(action,FE_PROJECT_ID,servers):
+        get_env_vars()
+        get_auth_token()
+        servers = list_ecs(tagname,tagvalue)
+        if do_ecs(action,servers):
             servers_names = [s for s in servers.keys()]
             print(f"{action} machines (" + str(len(servers_names)) + "):"+ str(servers_names))
     elif action == "list":
-        if nbargs == 2:
-            servers = list_all_ecs(FE_PROJECT_ID)
+        get_env_vars()
+        get_auth_token()
+        if tagname is False:
+            servers = list_all_ecs()
             servers_names = [s for s in servers.keys()]
-            print(f"Machines (" + str(len(servers_names)) + "):"+ str(servers_names))
+            print(str(len(servers_names)) + " machine(s) trouvées:"+ str(servers_names))
         else:
-            servers = list_ecs(FE_PROJECT_ID,tagname,tagvalue)
+            servers = list_ecs(tagname,tagvalue)
             servers_names = [s for s in servers.keys()]
-            print(f"Machines pour {tagname}={tagvalue} (" + str(len(servers_names)) + "):"+ str(servers_names))
+            print( str(len(servers_names)) + f" machine(s) trouvées pour {tagname}={tagvalue} (" + str(servers_names))
+    elif action == "help":
+        print(HELP)
     else:
         print(USAGE)
         exit(-1)
-
-if __name__ == "__main__":
-    main()
