@@ -13,12 +13,14 @@ exemple : "stop" équivalent à "stop shutdown yes"
 
 ## Aide
 
-help : affiche cette aide.
+- help : affiche cette aide.
 
 - list : liste toutes les machines ECS du projet.
 - list tag=val : liste toutes les machines ECS du projet qui portent le tag avec la valeur précisée.
+
 - start : démarre toutes les machines ECS qui portent le tag startup=yes.
 - start tag=val : démarre toutes les machines ECS qui portent le tag avec la valeur précisée.
+
 - stop : arrête toutes les machines ECS qui portent le tag shutdown=yes.
 - stop tag=val : arrête toutes les machines ECS qui portent le tag avec la valeur précisée.
 
