@@ -5,11 +5,11 @@ Script d'administration des machines sur Orange Business Cloud Flexible Engine
 Fonctionne via les appels API: https://docs.prod-cloud-ocb.orange-business.com/en-us/index.html
 
 ## Usage
-Usage : `flexeng <action> [<tagname>=<tagvalue>]`
-actions : help list start stop
-exemple : "flexeng list groupe=sul"
-exemple : "start" équivalent à "start startup yes"
-exemple : "stop" équivalent à "stop shutdown yes"
+Usage : `flexeng <action> [<tagname>=<tagvalue>]`  
+actions : help list start stop  
+exemple : "flexeng list groupe=sul"  
+exemple : "start" équivalent à "start startup yes"  
+exemple : "stop" équivalent à "stop shutdown yes"  
 
 ## Aide
 
